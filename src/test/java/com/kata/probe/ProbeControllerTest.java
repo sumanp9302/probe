@@ -36,7 +36,8 @@ class ProbeControllerTest {
             "commands":["F"] }
         """;
         mvc.perform(post("/api/probe/run").contentType(APPLICATION_JSON).content(body))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
     }
 
     @Test void start_on_obstacle_422() throws Exception {
@@ -46,6 +47,8 @@ class ProbeControllerTest {
             "commands":["F"], "obstacles":[{"x":2,"y":1}] }
         """;
         mvc.perform(post("/api/probe/run").contentType(APPLICATION_JSON).content(body))
-                .andExpect(status().isUnprocessableEntity());
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.error.message").value("Start is an obstacle"));
     }
 }
