@@ -1,3 +1,4 @@
+
 package com.kata.probe.api.controller;
 
 import com.kata.probe.api.dto.*;
@@ -8,35 +9,45 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/probe")
 public class ProbeController {
 
-    @PostMapping("/run")
-    public ResponseEntity<RunResponse> run(@Valid @RequestBody RunRequest req) {
-        // Build grid
-        Grid grid = new Grid(req.grid.width, req.grid.height);
 
-        // Add obstacles
+    @PostMapping("/run")
+    public ResponseEntity<?> run(@Valid @RequestBody RunRequest req) {
+        // 1) Direction guard -> 400 if invalid
+        Direction dir;
+        try {
+            dir = Direction.valueOf(req.direction);
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.badRequest().body(
+                    Map.of("error", Map.of("code", "VALIDATION_ERROR", "message", "Invalid direction value"))
+            );
+        }
+
+        // 2) Grid + obstacles
+        Grid grid = new Grid(req.grid.width, req.grid.height);
         if (req.obstacles != null) {
             req.obstacles.forEach(o -> grid.addObstacle(new Coordinate(o.x, o.y)));
         }
 
-        // Build probe
-        Direction dir = Direction.valueOf(req.direction);
+        // 3) Probe
         Probe probe = new Probe(new Coordinate(req.start.x, req.start.y), dir, grid);
 
-        // Execute commands
+        // 4) Execute
         CommandInterpreter.Result result = new CommandInterpreter().execute(probe, req.commands);
 
-        // Map response
+        // 5) Map OK response
         FinalStateDto fs = toFinalStateDto(probe);
         List<CoordinateDto> visited = toVisited(probe.getVisited());
         ExecutionDto ex = new ExecutionDto(result.executed, result.blocked, result.invalid);
 
         return ResponseEntity.ok(new RunResponse(fs, visited, ex));
     }
+
 
     private FinalStateDto toFinalStateDto(Probe probe) {
         return new FinalStateDto(
