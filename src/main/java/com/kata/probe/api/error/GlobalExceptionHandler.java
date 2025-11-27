@@ -32,4 +32,13 @@ public class GlobalExceptionHandler {
                 "error", Map.of("code", "VALIDATION_ERROR", "message", "Malformed JSON request")
         ));
     }
+
+
+    @ExceptionHandler(InvalidDirectionException.class)
+    public ResponseEntity<Map<String,Object>> handleInvalidDirection(InvalidDirectionException ex){
+        return ResponseEntity.badRequest().body(
+                Map.of("error", Map.of("code", "VALIDATION_ERROR", "message", ex.getMessage()))
+        );
+    }
+
 }
