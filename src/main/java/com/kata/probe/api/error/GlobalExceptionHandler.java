@@ -1,3 +1,4 @@
+
 package com.kata.probe.api.error;
 
 import org.springframework.http.ResponseEntity;
@@ -26,6 +27,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String,Object>> handleMalformed(HttpMessageNotReadableException ex){
+        // TDD GREEN: exact message required by the test
         return ResponseEntity.badRequest().body(Map.of(
                 "error", Map.of("code", "VALIDATION_ERROR", "message", "Malformed JSON request")
         ));
