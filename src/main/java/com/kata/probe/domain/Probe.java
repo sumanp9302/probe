@@ -18,20 +18,26 @@ public class Probe {
         visited.add(start);
     }
 
-    public boolean moveForward() {
-        Coordinate next = new Coordinate(
+    private Coordinate nextForward() {
+        return new Coordinate(
                 position.x() + direction.dxForward(),
                 position.y() + direction.dyForward()
         );
-        return applyMove(next);
     }
 
-    public boolean moveBackward() {
-        Coordinate next = new Coordinate(
+    private Coordinate nextBackward() {
+        return new Coordinate(
                 position.x() - direction.dxForward(),
                 position.y() - direction.dyForward()
         );
-        return applyMove(next);
+    }
+
+    public boolean moveForward() {
+        return applyMove(nextForward());
+    }
+
+    public boolean moveBackward() {
+        return applyMove(nextBackward());
     }
 
     public void turnLeft()  { direction = direction.left(); }

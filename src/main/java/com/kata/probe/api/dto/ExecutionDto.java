@@ -6,6 +6,8 @@ public class ExecutionDto {
     public int invalid;
 
     public ExecutionDto(int executed, int blocked, int invalid) {
-        this.executed = executed; this.blocked = blocked; this.invalid = invalid;
+        this.executed = executed;
+        this.blocked = blocked;
+        this.invalid = invalid;
     }
 }

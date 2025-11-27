@@ -8,6 +8,8 @@ public class RunResponse {
     public ExecutionDto execution;
 
     public RunResponse(FinalStateDto fs, List<CoordinateDto> visited, ExecutionDto ex) {
-        this.finalState = fs; this.visited = visited; this.execution = ex;
+        this.finalState = fs;
+        this.visited = visited;
+        this.execution = ex;
     }
 }

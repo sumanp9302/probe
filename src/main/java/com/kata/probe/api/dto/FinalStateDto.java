@@ -6,6 +6,8 @@ public class FinalStateDto {
     public String direction;
 
     public FinalStateDto(int x, int y, String direction) {
-        this.x = x; this.y = y; this.direction = direction;
+        this.x = x;
+        this.y = y;
+        this.direction = direction;
     }
 }
