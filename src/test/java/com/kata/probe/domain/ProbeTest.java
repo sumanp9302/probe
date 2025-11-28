@@ -1,6 +1,5 @@
-package com.kata.probe;
+package com.kata.probe.domain;
 
-import com.kata.probe.domain.*;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

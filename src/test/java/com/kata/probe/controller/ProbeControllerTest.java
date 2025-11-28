@@ -1,4 +1,4 @@
-package com.kata.probe;
+package com.kata.probe.controller;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
