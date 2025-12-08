@@ -1,4 +1,3 @@
-
 package com.kata.probe.controller;
 
 import org.junit.jupiter.api.DisplayName;
@@ -12,21 +11,20 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/**
- * TDD (RED): malformed JSON must be handled and return 400 with a unified error payload.
- */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
 class ProbeControllerMalformedJsonTest {
 
-    @Autowired MockMvc mvc;
+    @Autowired
+    MockMvc mvc;
 
     @Test
-    @DisplayName("Malformed JSON → 400 VALIDATION_ERROR: 'Malformed JSON request'")
-    void malformed_json_400() throws Exception {
-        // Broken JSON payload: missing closing brace and invalid token
+    @DisplayName("malformed JSON yields 400 VALIDATION_ERROR with 'Malformed JSON request'")
+    void malformed_json_returns_400() throws Exception {
         String malformed = """
-          { "grid": { "width": 5, "height": 5 },
+          {
+            "gridWidth": 5,
+            "gridHeight": 5,
             "start": { "x": 0, "y": 0 },
             "direction": "NORTH",
             "commands": ["F", "R", "F"],

@@ -6,9 +6,11 @@ import com.kata.probe.controller.response.RunResponse;
 import com.kata.probe.domain.Coordinate;
 import com.kata.probe.domain.Grid;
 import com.kata.probe.domain.Probe;
+import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+@Service
 public class ProbeService {
 
     public RunResponse run(RunRequest request){
