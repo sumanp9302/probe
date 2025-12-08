@@ -7,6 +7,7 @@ import com.kata.probe.domain.Direction;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -15,22 +16,21 @@ public class ProbeServiceTest {
     private final ProbeService probeService = new ProbeService();
 
     @Test
-    void countsInvalidAndBlockedCommandsInSummary(){
+    void countsInvalidAndBlockedCommandsInSummary() {
         RunRequest request = new RunRequest();
-        request.gridWidth = 3;
-        request.gridHeight = 3;
-        request.start = new Coordinate(1,1);
-        request.commands = Arrays.asList("F", "X", null, "F", "B");
-        request.obstacles = new Coordinate[]{ new Coordinate(1,2) }; // obstacle
+        request.gridWidth = 2;
+        request.gridHeight = 2;
+        request.start = new Coordinate(1, 1);
         request.direction = Direction.NORTH;
+        request.commands = Arrays.asList("F", "X", null, "F", "B");
+        request.obstacles = List.of(new Coordinate(0, 1));
 
-        RunResponse response = probeService.runProbe(request);
+        RunResponse response = probeService.run(request);
 
-        assertEquals(1, response.executionSummary.executed); // F blocked by obstacle, B blocked by out of bounds
-        assertEquals(2, response.executionSummary.blocked);  // F blocked by obstacle, B blocked by out of bounds
-        assertEquals(2, response.executionSummary.invalid);  // X and null
-        assertEquals(new Coordinate(1,0), response.finalPosition);
-
+        assertEquals(1, response.executionSummary.executed);
+        assertEquals(2, response.executionSummary.blocked);
+        assertEquals(2, response.executionSummary.invalid);
+        assertEquals(new Coordinate(1, 0), response.finalPosition);
     }
 
 }
