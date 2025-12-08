@@ -12,11 +12,11 @@ public class Grid {
         this.width = width; this.height = height;
     }
 
-    public boolean isWithinBounds(Coordinate c) {
-        return c.x() >= 0 && c.x() < width && c.y() >= 0 && c.y() < height;
+    public boolean isWithinBounds(Coordinate coordinate) {
+        return coordinate.x() >= 0 && coordinate.x() < width && coordinate.y() >= 0 && coordinate.y() < height;
     }
 
-    public boolean isObstacle(Coordinate c) { return obstacles.contains(c); }
+    public boolean isObstacle(Coordinate coordinate) { return obstacles.contains(coordinate); }
 
-    public void addObstacle(Coordinate c) { obstacles.add(c); }
+    public void addObstacle(Coordinate coordinate) { obstacles.add(coordinate); }
 }
