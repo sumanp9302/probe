@@ -1,5 +1,5 @@
 
-package com.kata.probe.api.error;
+package com.kata.probe.exception;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;

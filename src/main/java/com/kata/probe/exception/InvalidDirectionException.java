@@ -1,5 +1,5 @@
 
-package com.kata.probe.api.error;
+package com.kata.probe.exception;
 
 /**
  * Signals an invalid direction value in the API payload.

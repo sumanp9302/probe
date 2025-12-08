@@ -1,5 +1,5 @@
 
-package com.kata.probe.api.controller;
+package com.kata.probe.controller;
 
 import com.kata.probe.api.dto.*;
 import com.kata.probe.domain.*;
@@ -7,10 +7,9 @@ import com.kata.probe.service.CommandInterpreter;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import com.kata.probe.api.error.InvalidDirectionException;
+import com.kata.probe.exception.InvalidDirectionException;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/probe")
