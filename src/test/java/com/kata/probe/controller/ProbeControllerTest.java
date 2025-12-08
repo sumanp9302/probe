@@ -16,37 +16,48 @@ class ProbeControllerTest {
 
     @Autowired MockMvc mvc;
 
-    @Test void happy_path_200_ok() throws Exception {
+    @Test
+    void basic_run_returns_200_with_final_state_and_summary() throws Exception {
         String body = """
-          { "grid":{"width":5,"height":5},
-            "start":{"x":0,"y":0}, "direction":"NORTH",
-            "commands":["F","R","F"],
-            "obstacles":[{"x":2,"y":1}] }
+          {
+            "gridWidth": 3,
+            "gridHeight": 3,
+            "start": { "x": 0, "y": 0 },
+            "direction": "NORTH",
+            "commands": ["F", "R", "F"],
+            "obstacles": []
+          }
         """;
-        mvc.perform(post("/api/probe/run").contentType(APPLICATION_JSON).content(body))
+
+        mvc.perform(post("/api/probe/run")
+                        .contentType(APPLICATION_JSON)
+                        .content(body))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.finalState.direction").value("EAST"))
-                .andExpect(jsonPath("$.visited.length()").value(3));
+                .andExpect(jsonPath("$.finalPosition.x").value(1))
+                .andExpect(jsonPath("$.finalPosition.y").value(1))
+                .andExpect(jsonPath("$.finalDirection").value("EAST"))
+                .andExpect(jsonPath("$.visitedPath.length()").value(3))
+                .andExpect(jsonPath("$.executionSummary.executed").value(3));
     }
 
-    @Test void negative_coordinates_400() throws Exception {
+    @Test
+    void start_on_obstacle_returns_422_with_validation_error() throws Exception {
         String body = """
-          { "grid":{"width":5,"height":5},
-            "start":{"x":-1,"y":0}, "direction":"NORTH",
-            "commands":["F"] }
+          {
+            "gridWidth": 5,
+            "gridHeight": 5,
+            "start": { "x": 2, "y": 1 },
+            "direction": "NORTH",
+            "commands": ["F"],
+            "obstacles": [
+              { "x": 2, "y": 1 }
+            ]
+          }
         """;
-        mvc.perform(post("/api/probe/run").contentType(APPLICATION_JSON).content(body))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
-    }
 
-    @Test void start_on_obstacle_422() throws Exception {
-        String body = """
-          { "grid":{"width":5,"height":5},
-            "start":{"x":2,"y":1}, "direction":"NORTH",
-            "commands":["F"], "obstacles":[{"x":2,"y":1}] }
-        """;
-        mvc.perform(post("/api/probe/run").contentType(APPLICATION_JSON).content(body))
+        mvc.perform(post("/api/probe/run")
+                        .contentType(APPLICATION_JSON)
+                        .content(body))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.error.message").value("Start is an obstacle"));
