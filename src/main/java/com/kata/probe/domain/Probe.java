@@ -9,13 +9,13 @@ public class Probe {
     private final Grid grid;
     private final List<Coordinate> visited = new ArrayList<>();
 
-    public Probe(Coordinate start, Direction direction, Grid grid) {
-        if (!grid.isWithinBounds(start)) throw new IllegalArgumentException("Start out of bounds");
-        if (grid.isObstacle(start)) throw new IllegalArgumentException("Start is an obstacle");
-        this.position = start;
-        this.direction = direction;
+    public Probe(Coordinate startPosition, Direction startDirection, Grid grid) {
+        if (!grid.isWithinBounds(startPosition)) throw new IllegalArgumentException("Start out of bounds");
+        if (grid.isObstacle(startPosition)) throw new IllegalArgumentException("Start is an obstacle");
+        this.position = startPosition;
+        this.direction = startDirection;
         this.grid = grid;
-        visited.add(start);
+        visited.add(startPosition);
     }
 
     private Coordinate nextForward() {
