@@ -1,0 +1,90 @@
+Areas for Improvement
+Based on the original requirements and client feedback, here are the key enhancements to consider:
+
+State Management
+Current design is stateless (POST /api/probe/run). Introduce minimal in-memory state so the probe can be created and queried later.
+Suggested endpoints:
+POST /v1/probe → create probe
+POST /v1/probe/{id}/commands → apply commands
+GET /v1/probe/{id} → fetch current position and visited path. 
+API Design
+Use /v1 prefix for versioning.
+Return structured responses (position, direction, visited coordinates).
+Add an error model (e.g., invalid command → 400 with details).
+Logging
+Add basic SLF4J logs in controller and service:
+Incoming request details as debug logs.
+Command execution summary as info logs
+Error logs wherever required.
+README
+Expand with:
+Curl examples for new endpoints.
+Error response examples.
+Quick start instructions.
+Tests
+Keep unit tests for domain logic.
+Add at least one integration test using MockMvc for the API.
+OO Design
+Ensure immutability for value objects (Coordinate, Grid).
+Consider Command pattern for moves (optional but neat).
+
+Example (Immutable Coordinate and Grid):
+public record Coordinate(int x, int y) {
+// record automatically makes fields final and immutable
+}
+-----------------------------------------------------------------------------------------
+public record Grid(int width, int height) {
+    public boolean contains(Coordinate coordinate) {
+        return coordinate.x() >= 0 && coordinate.x() < width && coordinate.y() >= 0 && coordinate.y() < height;
+    }
+}
+
+Here:
+record in Java creates immutable objects by default.
+No setters, only getters.
+Any change requires creating a new instance.
+
+
+Command Pattern for Moves
+What it means:
+Instead of using if/else or switch for commands (F, B, L, R), create separate classes implementing a Command interface. Each command knows how to execute itself on the probe.
+Why:
+Makes adding new commands easy (Open/Closed Principle).
+Removes complex conditional logic.
+Improves readability and testability.
+Example:
+public interface Command {
+    void execute(ProbeAggregate probe);
+}
+
+public class ForwardCommand implements Command {
+@Override
+public void execute(ProbeAggregate probe) {
+    Coordinate next = probe.direction().forward(probe.position());
+     if (probe.grid().contains(next)) {
+        probe.moveTo(next);
+      }
+    }
+}
+
+public class TurnLeftCommand implements Command {
+@Override
+public void execute(ProbeAggregate probe) {
+    probe.turnLeft();
+    }
+}
+Usage
+List<Command> commands = List.of(new ForwardCommand(), new TurnLeftCommand());
+commands.forEach(cmd -> cmd.execute(probe));
+Instead of:
+for (String cmd : commands) {
+    switch(cmd) {
+        case "F": moveForward(); 
+        break;
+        case "L": turnLeft(); 
+        break;
+        // ...
+    }
+}
+
+Overall Goal: Keep it simple, elegant, and aligned with the kata expectations while addressing feedback on state, API design, and basic observability.
