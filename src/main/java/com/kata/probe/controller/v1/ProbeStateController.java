@@ -17,7 +17,6 @@ import java.util.UUID;
 public class ProbeStateController {
 
     private static final Logger log = LoggerFactory.getLogger(ProbeStateController.class);
-
     private final ProbeStateService service;
 
     public ProbeStateController(ProbeStateService service) {
@@ -26,7 +25,7 @@ public class ProbeStateController {
 
     @PostMapping
     public CreateProbeResponse create(@RequestBody CreateProbeRequest req) {
-        log.debug("Creating probe: {}", req);
+        log.info("Received probe creation request: {}", req);
 
         UUID id = service.create(
                 req.gridWidth,
@@ -35,12 +34,13 @@ public class ProbeStateController {
                 req.direction
         );
 
+        log.debug("Returning created probe ID={}", id);
         return new CreateProbeResponse(id);
     }
 
     @GetMapping("/{id}")
     public ProbeStateResponse get(@PathVariable UUID id) {
-        log.debug("Fetching probe with id {}", id);
+        log.info("Request to fetch probe ID={}", id);
 
         var agg = service.get(id);
 
@@ -57,7 +57,7 @@ public class ProbeStateController {
             @PathVariable UUID id,
             @RequestBody ApplyCommandsRequest req
     ) {
-        log.debug("Applying commands {} to probe {}", req.commands, id);
+        log.info("Request to apply commands to probe ID={}: {}", id, req.commands);
 
         var agg = service.apply(id, req.commands);
 
