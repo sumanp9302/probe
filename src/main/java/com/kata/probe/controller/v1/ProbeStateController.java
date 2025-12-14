@@ -1,5 +1,6 @@
 package com.kata.probe.controller.v1;
 
+import com.kata.probe.controller.request.v1.ApplyCommandsRequest;
 import com.kata.probe.controller.request.v1.CreateProbeRequest;
 import com.kata.probe.controller.response.v1.ProbeStateResponse;
 import com.kata.probe.service.ProbeStateService;
@@ -32,4 +33,20 @@ public class ProbeStateController {
                 agg.getSummary()
         );
     }
+
+    @PostMapping("/{id}/commands")
+    public ProbeStateResponse apply(
+            @PathVariable UUID id,
+            @RequestBody ApplyCommandsRequest req) {
+
+        var agg = service.apply(id, req.commands);
+
+        return new ProbeStateResponse(
+                agg.getProbe().getPosition(),
+                agg.getProbe().getDirection(),
+                agg.getVisited(),
+                agg.getSummary()
+        );
+    }
+
 }
