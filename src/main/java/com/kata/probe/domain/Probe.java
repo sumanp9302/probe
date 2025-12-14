@@ -7,16 +7,20 @@ public class Probe {
     private Coordinate position;
     private Direction direction;
     private final Grid grid;
+    private final ObstacleMap obstacleMap;
     private final List<Coordinate> visited = new ArrayList<>();
 
-    public Probe(Coordinate startPosition, Direction startDirection, Grid grid) {
-        if (!grid.isWithinBounds(startPosition)) throw new IllegalArgumentException("Start out of bounds");
-        if (grid.isObstacle(startPosition)) throw new IllegalArgumentException("Start is an obstacle");
-        this.position = startPosition;
-        this.direction = startDirection;
+    public Probe(Coordinate start, Direction direction, Grid grid, ObstacleMap obstacleMap) {
+        if (!grid.isWithinBounds(start)) {
+            throw new IllegalArgumentException("Start position out of bounds: " + start);
+        }
+        this.position = start;
+        this.direction = direction;
         this.grid = grid;
-        visited.add(startPosition);
+        this.obstacleMap = obstacleMap;
+        this.visited.add(start);
     }
+
 
     private Coordinate nextForward() {
         return new Coordinate(
@@ -44,12 +48,13 @@ public class Probe {
     public void turnRight() { direction = direction.right(); }
 
     private boolean applyMove(Coordinate next) {
-        if (!grid.isWithinBounds(next)) return false;      // blocked: out of bounds
-        if (grid.isObstacle(next)) return false;           // blocked: obstacle
+        if (!grid.isWithinBounds(next)) return false;       // blocked: out of bounds
+        if (obstacleMap.hasObstacle(next)) return false;    // blocked: obstacle
         this.position = next;
         visited.add(next);
         return true;
     }
+
 
     public Coordinate getPosition() { return position; }
     public Direction getDirection() { return direction; }

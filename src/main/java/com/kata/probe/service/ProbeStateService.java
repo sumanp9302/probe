@@ -31,7 +31,11 @@ public class ProbeStateService {
                 width, height, start, direction);
 
         Grid grid = new Grid(width, height);
-        Probe probe = new Probe(start, direction, grid);
+
+        // NEW: stateful probes always use an empty obstacle map
+        ObstacleMap obstacleMap = new ObstacleMap();
+
+        Probe probe = new Probe(start, direction, grid, obstacleMap);
         ProbeAggregate agg = new ProbeAggregate(grid, probe);
 
         UUID id = repo.save(agg);
@@ -54,6 +58,9 @@ public class ProbeStateService {
         log.info("Applying {} commands to probe ID={}", rawCommands.size(), id);
 
         var agg = get(id);
+
+        // OLD: Probe probe = agg.getProbe();
+        // But agg.getProbe() returns a Probe constructed earlier — OK
         Probe probe = agg.getProbe();
 
         int executed = 0;
