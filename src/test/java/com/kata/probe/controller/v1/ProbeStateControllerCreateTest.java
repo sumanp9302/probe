@@ -1,9 +1,11 @@
 package com.kata.probe.controller.v1;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kata.probe.controller.request.v1.CreateProbeRequest;
 import com.kata.probe.domain.Coordinate;
 import com.kata.probe.domain.Direction;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -25,16 +27,22 @@ class ProbeStateControllerCreateTest {
 
     @Test
     void create_probe_returns_id() throws Exception {
+
         CreateProbeRequest req = new CreateProbeRequest();
         req.gridWidth = 5;
         req.gridHeight = 5;
         req.start = new Coordinate(0,0);
         req.direction = Direction.NORTH;
 
-        mvc.perform(post("/v1/probe")
+        var result = mvc.perform(post("/v1/probe")
                         .contentType(APPLICATION_JSON)
                         .content(mapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
-                .andExpect(result -> UUID.fromString(result.getResponse().getContentAsString()));
+                .andReturn();
+
+        JsonNode json = mapper.readTree(result.getResponse().getContentAsString());
+        String id = json.get("id").asText();
+
+        UUID.fromString(id); // succeeds now
     }
 }

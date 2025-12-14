@@ -6,10 +6,12 @@ import com.kata.probe.domain.commands.CommandFactory;
 import com.kata.probe.domain.commands.InvalidCommand;
 import com.kata.probe.exception.ProbeNotFoundException;
 import com.kata.probe.repository.ProbeRepository;
+import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
 
+@Service
 public class ProbeStateService {
 
     private final ProbeRepository repo;

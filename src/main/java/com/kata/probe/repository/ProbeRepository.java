@@ -1,8 +1,11 @@
 package com.kata.probe.repository;
 
 import com.kata.probe.domain.ProbeAggregate;
+import org.springframework.stereotype.Repository;
+
 import java.util.*;
 
+@Repository
 public class ProbeRepository {
 
     private final Map<UUID, ProbeAggregate> store = new HashMap<>();
