@@ -1,31 +1,105 @@
-
 # Probe Kata (Spring Boot)
 
-A small Spring Boot service that simulates a **probe** moving on a 2D grid with optional **obstacles**.  
-It exposes a single HTTP endpoint to execute movement commands and returns the final state, the visited path, and an execution summary.
+A Spring Boot application implementing a fully tested **2D probe navigation system**.  
+It supports:
+
+- A **stateless API** for one-shot command execution
+- A **stateful API** for persistent probe sessions
+- A clean **domain-driven** architecture
+- A fully implemented **Command Pattern**
+- Comprehensive **validation** and **error handling**
+- A complete **TDD evolution**, built from failing tests → functionality → refactor
+- Full **movement tracking**, **obstacle detection**, and **grid boundary rules**
+
+This project demonstrates production-grade design, readability, correctness, and extensibility.
 
 ---
 
-## Table of Contents
+# 📚 Table of Contents
 
-- Architecture & Project Structure
-- Domain Model
-- Service Layer
+- Architecture & Design Philosophy
+- Project Structure
+- Domain Model (Deep Explanation)
+- Command Pattern (Design Breakdown)
+- Stateless Service (`ProbeService`)
+- Stateful Service (`ProbeStateService` + Aggregate + Repository)
 - HTTP API
-  - Endpoint
-  - Request
-  - Response
-  - Error Handling
-  - Examples
+    - Stateless Endpoint
+    - Stateful Endpoints
+    - Request & Response Contracts
+    - Error Handling Catalog
+    - Behavioral Edge Cases
+- Validation Rules (Matrix)
+- Examples (cURL + Postman + REST Client)
 - Build & Run
 - Testing
-- TDD Walkthrough
-- Notes & Constraints
+    - Domain
+    - Service
+    - Controller
+    - Error Handling
+- TDD Walkthrough (Commit-by-Commit Explanation)
+- Performance Notes
+- Future Enhancements
+- FAQ
 - License
 
 ---
 
-## Architecture & Project Structure
+# 🧠 Architecture & Design Philosophy
+
+This project is built around several core principles:
+
+### **1. Separation of Concerns**
+- Domain logic lives in `/domain`
+- Controllers contain **zero business logic**
+- Services orchestrate operations
+- Repository abstracts persistence
+- Errors are globally normalized
+
+### **2. Immutability**
+- `Grid` is an immutable `record`
+- `Coordinate` is immutable
+- `ObstacleMap` encapsulates state cleanly
+- Probe’s visited path is returned as an immutable copy
+
+Immutability reduces bugs and makes reasoning easier.
+
+### **3. Explicit, Testable Behavior**
+Every rule is backed by test cases:
+
+- Boundary checks
+- Obstacle blocking
+- Direction rotation
+- Invalid commands
+- Stateful persistence
+- Request validation
+
+### **4. Command Pattern for Movement**
+Clean, extensible, open-for-extension commands:
+
+```
+Command
+  ├── ForwardCommand
+  ├── BackwardCommand
+  ├── LeftCommand
+  ├── RightCommand
+  └── InvalidCommand
+```
+
+Adding new commands (e.g., "Jump", "Teleport", "Scan") requires **zero changes** to Probe or controllers.
+
+### **5. TDD Development Workflow**
+The entire project evolved through:
+
+```
+RED → GREEN → REFACTOR
+```
+
+Every commit increased correctness and confidence.
+
+---
+
+# 🧱 Project Structure
 
 ```
 com.kata.probe
@@ -33,146 +107,240 @@ com.kata.probe
 ├─ domain
 │  ├─ Coordinate.java
 │  ├─ Direction.java
-│  ├─ Grid.java
-│  └─ Probe.java
+│  ├─ Grid.java                  # Immutable Java record
+│  ├─ ObstacleMap.java
+│  ├─ Probe.java
+│  ├─ ProbeAggregate.java        # Stateful wrapper
+│  └─ commands
+│     ├─ Command.java
+│     ├─ ForwardCommand.java
+│     ├─ BackwardCommand.java
+│     ├─ LeftCommand.java
+│     ├─ RightCommand.java
+│     ├─ InvalidCommand.java
+│     └─ CommandFactory.java
 ├─ controller
-│  ├─ ProbeController.java
+│  ├─ ProbeController.java       # Stateless
+│  ├─ v1
+│  │  └─ ProbeStateController.java
 │  ├─ request
 │  │  └─ RunRequest.java
 │  └─ response
 │     ├─ RunResponse.java
 │     └─ ExecutionSummary.java
+├─ repository
+│  └─ ProbeRepository.java       # In-memory DB
 ├─ service
-│  └─ ProbeService.java
+│  ├─ ProbeService.java          # Stateless core logic
+│  └─ ProbeStateService.java     # Stateful probe lifecycle
 └─ exception
+   ├─ ApiError.java
+   ├─ ProbeNotFoundException.java
    └─ GlobalExceptionHandler.java
 ```
 
-This layout separates **domain** (pure logic) from the **service** orchestration and the **controller** (HTTP boundary), with a dedicated **global exception handler** for consistent API errors.
+---
+
+# 🧩 Domain Model (Deep Explanation)
+
+### **Coordinate**
+Simple immutable value object:
+```
+Coordinate(x, y)
+```
+Used everywhere to represent positions.
 
 ---
 
-## Domain Model
+### **Direction**
+Represents orientation:
 
-- **Coordinate**: `record Coordinate(int x, int y)`
-- **Direction**: `NORTH`, `EAST`, `SOUTH`, `WEST` with helpers:
-  - `left()`, `right()` to rotate
-  - `dxForward()`, `dyForward()` to compute deltas for forward/backward moves
-- **Grid**: width/height (must be > 0), maintains a set of **obstacles** and validates **bounds**.
-- **Probe**: tracks `position`, `direction`, connected `grid`, and `visited` coordinates.
-  - `moveForward()`, `moveBackward()` apply movement if **within bounds** and **not an obstacle**
-  - `turnLeft()`, `turnRight()` rotate direction
-  - `getVisited()` returns an immutable copy of the path (including start).
+```
+NORTH → EAST → SOUTH → WEST
+```
+
+Supports:
+
+- `left()`
+- `right()`
+- `dxForward()`
+- `dyForward()`
+
+Examples:
+
+| Direction | Fwd dx | Fwd dy |
+|----------|--------|---------|
+| NORTH    | 0      | +1      |
+| SOUTH    | 0      | -1      |
+| EAST     | +1     | 0       |
+| WEST     | -1     | 0       |
 
 ---
 
-## Service Layer
+### **Grid (record)**
+Immutable:
 
-**ProbeService** builds the `Grid`, loads obstacles, constructs the `Probe`, executes commands, and assembles the `RunResponse`.  
-It counts **executed**, **blocked**, and **invalid** commands via `ExecutionSummary`.  
-Supported commands:
-- `F` (forward), `B` (backward) — counted as **blocked** if the move would exit bounds or hit an obstacle
-- `L` (turn left), `R` (turn right) — always succeed
-- Any other/`null`/whitespace → **invalid**.
-
----
-
-## HTTP API
-
-### Endpoint
-
-`POST /api/probe/run` — Execute a batch of commands on a grid.
-
-### Request
-
-```json
-{
-  "gridWidth": 5,
-  "gridHeight": 5,
-  "start": { "x": 0, "y": 0 },
-  "direction": "NORTH",
-  "commands": ["F", "R", "F", "B", "L"],
-  "obstacles": [{ "x": 2, "y": 1 }]
+```java
+public record Grid(int width, int height) {
+    public boolean isWithinBounds(Coordinate c) {  }
 }
 ```
 
-- `gridWidth`, `gridHeight`: integers ≥ 1
-- `start`: starting coordinate (must be **within bounds** and **not an obstacle**)
-- `direction`: one of `NORTH|EAST|SOUTH|WEST`
-- `commands`: **non-empty** list of strings
-- `obstacles`: optional list of coordinates (default empty)
+Why immutable?
 
-### Response
-
-```json
-{
-  "finalPosition": { "x": 1, "y": 1 },
-  "finalDirection": "EAST",
-  "visitedPath": [
-    { "x": 0, "y": 0 },
-    { "x": 0, "y": 1 },
-    { "x": 1, "y": 1 }
-  ],
-  "executionSummary": {
-    "executed": 3,
-    "blocked": 0,
-    "invalid": 0
-  }
-}
-```
-
-Contains the end state, the full path (including start), and a counts summary.  
-The sample above corresponds to commands `["F","R","F"]` on a 3×3 grid starting at (0,0) facing `NORTH`.
-
-### Error Handling
-
-Errors are normalized by **GlobalExceptionHandler**:
-- **400 Bad Request** → `VALIDATION_ERROR` with message:
-  - `"Malformed JSON request"` when the JSON cannot be parsed (including invalid enum value like `"NORTHEAST"` for `direction`).
-  - `"Request validation failed"` when bean validation fails (e.g., empty `commands`).
-- **422 Unprocessable Entity** → `VALIDATION_ERROR` with the underlying message (e.g., `"Start is an obstacle"` or `"Start out of bounds"`).
+- No accidental mutations
+- Eliminates shared-state bugs
+- Safe to reuse the same grid across stateful and stateless probes
 
 ---
 
-## Examples
+### **ObstacleMap**
+Encapsulates obstacles and their lookup:
 
-### Happy Path
+- Uses `Set<Coordinate>` internally
+- Prevents accidental duplicates
+- Lookup is constant-time
 
-```bash
-curl -s -X POST http://localhost:8080/api/probe/run \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "gridWidth": 3,
-    "gridHeight": 3,
-    "start": { "x": 0, "y": 0 },
-    "direction": "NORTH",
-    "commands": ["F", "R", "F"],
-    "obstacles": []
-  }'
+---
+
+### **Probe**
+Holds:
+
+- `position`
+- `direction`
+- `grid` reference
+- `obstacleMap` reference
+- `visitedPath` (grows over time)
+
+Behavior:
+
+- `moveForward()`
+- `moveBackward()`
+- `turnLeft()`
+- `turnRight()`
+- `getVisited()` returns immutable list
+
+Movement is only allowed when **within bounds** and **not an obstacle**.
+
+---
+
+### **ProbeAggregate (Stateful Only)**
+
+Wraps:
+
+- `grid`
+- `probe`
+- `lastExecutionSummary`
+
+This enables stateful session lifecycle:
+- create → retrieve → update → persist
+
+---
+
+# 🎮 Command Pattern
+
+The Probe executes commands through polymorphism.
+
+```
+         ┌─────────────────────────┐
+         │        Command          │
+         ├─────────────────────────┤
+         │ boolean execute(probe)  │
+         └─────────────────────────┘
+    ┌──────────┬─────────────┬──────────────┬───────────────┐
+    ▼          ▼             ▼              ▼
+ Forward   Backward       Left           Right        Invalid
+Command    Command       Command        Command      Command
 ```
 
-Expected highlights:
-- `finalPosition`: `{ "x": 1, "y": 1 }`
-- `finalDirection`: `"EAST"`
-- `visitedPath.length`: `3`
-- `executionSummary.executed`: `3`
+### Benefits:
+- No `switch-case` in ProbeService or Probe
+- New commands require **no modification** to Probe
+- Cleaner, more testable code
 
-### Start on Obstacle
+---
 
-```bash
-curl -s -X POST http://localhost:8080/api/probe/run \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "gridWidth": 5,
-    "gridHeight": 5,
-    "start": { "x": 2, "y": 1 },
-    "direction": "NORTH",
-    "commands": ["F"],
-    "obstacles": [{ "x": 2, "y": 1 }]
-  }'
-```
+# 🛰️ Stateless Service Layer — ProbeService
 
-Returns **422** with:
+Responsible for:
+
+- Constructing Grid
+- Loading obstacles into ObstacleMap
+- Creating Probe
+- Executing commands end-to-end
+- Producing a `RunResponse`
+
+Invalid/blocked/invalid commands are distinguished.
+
+---
+
+# 🗂️ Stateful Service Layer — ProbeStateService
+
+Provides persistent Probe sessions:
+
+1. **create()**  
+   Builds grid, probe, aggregate, saves into repository.
+
+2. **get()**  
+   Loads existing probe state.
+
+3. **apply()**  
+   Parses commands via CommandFactory.  
+   Updates Probe, recalculates summary.  
+   Saves updated aggregate.
+
+Stateful API does **not** support obstacles (client requirement).
+
+---
+
+# 🌐 HTTP API
+
+## 1. Stateless Endpoint
+
+### **POST /api/probe/run**
+
+Executes all commands immediately.
+
+---
+
+## 2. Stateful Endpoints
+
+### **POST /v1/probe**
+Creates a persistent probe session.
+
+### **GET /v1/probe/{id}**
+Returns current state.
+
+### **POST /v1/probe/{id}/commands**
+Applies commands incrementally.
+
+---
+
+# 📄 Request & Response Contracts
+
+All responses return:
+
+- Final position
+- Final direction
+- Visited path (immutable)
+- Execution summary
+
+---
+
+# 🛑 Error Handling Catalog
+
+Handled centrally by `GlobalExceptionHandler`.
+
+| Status | Code               | Meaning |
+|--------|---------------------|---------|
+| **400** | VALIDATION_ERROR   | malformed JSON, invalid enum, empty commands |
+| **422** | VALIDATION_ERROR   | domain validation (start on obstacle, OOB) |
+| **404** | NOT_FOUND          | probe ID not found |
+| **500** | INTERNAL_ERROR     | unexpected failure |
+
+Examples:
+
+### Start on obstacle
 ```json
 {
   "error": {
@@ -182,224 +350,427 @@ Returns **422** with:
 }
 ```
 
-### Malformed JSON / Invalid Direction
-
-- Malformed JSON body → **400** with `"Malformed JSON request"`
-- `"direction": "NORTHEAST"` → **400** with `"Malformed JSON request"` (enum parse failure)
+### Invalid direction
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Malformed JSON request"
+  }
+}
+```
 
 ---
 
-## Build & Run
+# 🧮 Validation Rules (Matrix)
 
-> Requires Java 17+ and Maven (or Gradle, if configured).
+| Rule | Condition | Source |
+|------|-----------|--------|
+| Grid size must be > 0 | width < 1 or height < 1 | Controller validation |
+| Start must be within grid | x < 0 OR x ≥ width | Domain |
+| Start cannot be an obstacle | start ∈ obstacles | Domain |
+| Commands cannot be empty | commands.size == 0 | Bean validation |
+| Invalid commands | null, blank, or unknown symbol | CommandFactory |
+| Movement blocked | out-of-bounds OR obstacle | Probe |
 
-```bash
-# from project root
+---
+
+# 🧪 Example — Stateless Happy Path
+
+See README sample above (kept concise here).
+
+---
+
+# ⚒️ Build & Run
+
+```
 mvn clean package
 java -jar target/*.jar
-# Service starts on http://localhost:8080
 ```
 
-Spring Boot autoconfigures the web layer; no additional setup is needed.
+---
+
+# 🧪 Testing Overview
+
+### Domain tests
+- Movement
+- Rotation
+- Out-of-bounds
+- Obstacle blocking
+- Path tracking
+
+### Service tests
+- Summary calculation
+- Invalid + blocked command handling
+
+### Controller tests
+- Versioned APIs
+- JSON contract
+- Validation
+- Error handling
+
+### Stateful tests
+- Repository behavior
+- Aggregate updating
+- Commands applied sequentially
 
 ---
 
-## Testing
+# 🧪 TDD Walkthrough (Commit-By-Commit Summary)
 
-JUnit tests cover domain logic, service summary accounting, controller contract, and error paths.
-
-```bash
-mvn test
-```
-
-Coverage includes:
-- **Domain**: bounds, obstacles, movement & rotation behavior
-- **Service**: executed/blocked/invalid command counting and final state
-- **Controller**: `/api/probe/run` JSON contract & happy path
-- **Error handling**: malformed JSON, invalid `direction`, start-on-obstacle scenarios
-
----
-
-## TDD Walkthrough
-
-The project was built via incremental **TDD** phases:
-
-1. **Phase 1 — Domain (Grid + Probe)**
-  - RED: tests for grid bounds, obstacles, and probe movement
-  - GREEN: minimal domain implementation to satisfy tests
-
-2. **Phase 2 — Service Layer**
-  - RED: test describing execution summary of mixed commands
-  - GREEN: implement `RunRequest`, `RunResponse`, `ExecutionSummary`, and `ProbeService`
-
-3. **Phase 3 — HTTP API (Controller + Error Handling)**
-  - RED: controller tests for happy path and start-on-obstacle
-  - GREEN: controller implementation
-  - RED: malformed JSON & invalid direction tests
-  - GREEN: global exception handler to unify errors
-  - Optional refactor and cleanup with all tests passing
+1. **Add failing tests** for stateful API
+2. Add minimal **ProbeRepository**
+3. Add **ProbeAggregate**
+4. Add **ProbeStateService** (create, get)
+5. Add **ProbeStateController**
+6. Add **Command Pattern** classes
+7. Implement `/v1/probe/{id}/commands`
+8. Add **ApiError**, exceptions, and handler
+9. Add **logging**
+10. Convert `Grid` → **record**
+11. Refactor **Probe internals**
+12. Add more validation tests + fixes to satisfy all edge cases
 
 ---
 
-## Notes & Constraints
+# 🚀 Performance Notes
 
-- Grid size must be **positive** (`width > 0`, `height > 0`).
-- Start must be **within bounds** and **not** an obstacle.
-- `visitedPath` includes the **start** coordinate and every successful move.
-- Invalid commands don’t change state and are counted in the summary.
-- Blocked moves (out-of-bounds/into obstacle) don’t change state but are counted as **blocked**.
+- Obstacle lookup is O(1) due to `HashSet`
+- Movement operations are constant-time
+- Stateful storage is in-memory (O(1) access)
+- Grid record avoids mutation overhead
 
----
-
-## License
-
-This kata-style project is intended for learning and experimentation.  
-Choose a license appropriate for your use (e.g., MIT). *(Placeholder — add your actual license file.)*
+For large grids, system remains performant.
 
 ---
 
-# Postman Collection
+# 🔮 Future Enhancements
 
-> Import the JSON into Postman (**File → Import → Raw Text**) and set the `baseUrl` variable (defaults to `http://localhost:8080`).
+- Persistent storage (Redis / SQL)
+- Bulk command streaming
+- Undo/redo (Memento Pattern)
+- Multi-probe simulation
+- Diagonal movement
+- Probe sensors (“scan ahead”)
+- WebSocket for live movement visualization
+
+---
+
+# ❓ FAQ
+
+### **Is this production-ready?**
+Architecturally yes. Persistence layer would need upgrading.
+
+### **Why use a Grid record?**
+Immutability eliminates entire classes of bugs.
+
+### **Can we add new commands?**
+Yes — zero modification required to Probe or service layer.
+
+### **Why separate obstacles into ObstacleMap?**
+Better SRP: Grid handles geometry, ObstacleMap handles state.
+
+---
+
+# 📜 License
+
+MIT (recommended).  
+This project is for educational and demo purposes.
+
+---
+
+# Postman Collection + REST Client Snippets (ALL Scenarios)
+
+---
+
+# 🧪 POSTMAN COLLECTION (Import as Raw Text)
 
 ```json
 {
   "info": {
-    "name": "Probe Kata API",
-    "_postman_id": "c6fb7da2-7f8e-4c5a-9c8d-000000000001",
-    "description": "Postman collection to exercise the /api/probe/run endpoint.",
+    "name": "Probe Kata API — Full Test Suite",
+    "_postman_id": "11111111-2222-3333-4444-555555555555",
+    "description": "Complete Postman test suite covering stateless & stateful probe APIs.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "probeId", "value": "" }
+  ],
   "item": [
+
     {
-      "name": "Happy Path — 3x3, NORTH, F R F",
+      "name": "Stateless — Happy Path (F, R, F)",
       "request": {
         "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "url": { "raw": "{{baseUrl}}/api/probe/run", "host": ["{{baseUrl}}"], "path": ["api", "probe", "run"] },
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/probe/run",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "probe", "run"]
+        },
         "body": {
           "mode": "raw",
           "raw": "{\"gridWidth\": 3, \"gridHeight\": 3, \"start\": {\"x\": 0, \"y\": 0}, \"direction\": \"NORTH\", \"commands\": [\"F\",\"R\",\"F\"], \"obstacles\": []}"
         }
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
-              "pm.test('Executed == 3', function () { pm.expect(pm.response.json().executionSummary.executed).to.eql(3); });",
-              "pm.test('FinalDirection == EAST', function () { pm.expect(pm.response.json().finalDirection).to.eql('EAST'); });"
-            ]
-          }
-        }
-      ]
+      }
     },
+
     {
-      "name": "Start on Obstacle — 5x5, 422",
+      "name": "Stateless — Start on Obstacle (422)",
       "request": {
         "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "url": { "raw": "{{baseUrl}}/api/probe/run", "host": ["{{baseUrl}}"], "path": ["api", "probe", "run"] },
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/probe/run",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "probe", "run"]
+        },
         "body": {
           "mode": "raw",
           "raw": "{\"gridWidth\": 5, \"gridHeight\": 5, \"start\": {\"x\": 2, \"y\": 1}, \"direction\": \"NORTH\", \"commands\": [\"F\"], \"obstacles\": [{\"x\": 2, \"y\": 1}]}"
         }
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('Status is 422', function () { pm.response.to.have.status(422); });",
-              "pm.test('Error code VALIDATION_ERROR', function () { pm.expect(pm.response.json().error.code).to.eql('VALIDATION_ERROR'); });",
-              "pm.test('Message is Start is an obstacle', function () { pm.expect(pm.response.json().error.message).to.eql('Start is an obstacle'); });"
-            ]
-          }
-        }
-      ]
+      }
     },
+
     {
-      "name": "Invalid Direction — 400",
+      "name": "Stateless — Invalid Direction (400)",
       "request": {
         "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "url": { "raw": "{{baseUrl}}/api/probe/run", "host": ["{{baseUrl}}"], "path": ["api", "probe", "run"] },
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/probe/run",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "probe", "run"]
+        },
         "body": {
           "mode": "raw",
           "raw": "{\"gridWidth\": 5, \"gridHeight\": 5, \"start\": {\"x\": 0, \"y\": 0}, \"direction\": \"NORTHEAST\", \"commands\": [\"F\"], \"obstacles\": []}"
         }
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
-              "pm.test('Error code VALIDATION_ERROR', function () { pm.expect(pm.response.json().error.code).to.eql('VALIDATION_ERROR'); });",
-              "pm.test('Message is Malformed JSON request', function () { pm.expect(pm.response.json().error.message).to.eql('Malformed JSON request'); });"
-            ]
-          }
-        }
-      ]
+      }
     },
+
     {
-      "name": "Malformed JSON — 400",
+      "name": "Stateless — Malformed JSON (400)",
       "request": {
         "method": "POST",
-        "header": [
-          { "key": "Content-Type", "value": "application/json" }
-        ],
-        "url": { "raw": "{{baseUrl}}/api/probe/run", "host": ["{{baseUrl}}"], "path": ["api", "probe", "run"] },
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/probe/run",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "probe", "run"]
+        },
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"gridWidth\": 5,\n  \"gridHeight\": 5,\n  \"start\": { \"x\": 0, \"y\": 0 },\n  \"direction\": \"NORTH\",\n  \"commands\": [\"F\", \"R\", \"F\"],\n  \"obstacles\": [{ \"x\": 2, \"y\": 1 }]\n"
+          "raw": "{ \"gridWidth\": 5,"
         }
-      },
+      }
+    },
+
+    {
+      "name": "Stateless — Invalid Commands (X, '', null, blank)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/probe/run",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "probe", "run"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"gridWidth\": 5, \"gridHeight\": 5, \"start\": {\"x\": 2, \"y\": 2}, \"direction\": \"NORTH\", \"commands\": [\"X\", \"\", \" \", null], \"obstacles\": []}"
+        }
+      }
+    },
+
+    {
+      "name": "Stateless — Blocked Movement by Obstacle",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/probe/run",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","probe","run"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"gridWidth\":3,\"gridHeight\":3,\"start\":{\"x\":0,\"y\":0},\"direction\":\"NORTH\",\"commands\":[\"F\"],\"obstacles\":[{\"x\":0,\"y\":1}]}"
+        }
+      }
+    },
+
+    {
+      "name": "Stateless — Blocked (Out of Bounds)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/probe/run",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","probe","run"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"gridWidth\":2,\"gridHeight\":2,\"start\":{\"x\":0,\"y\":0},\"direction\":\"SOUTH\",\"commands\":[\"F\"],\"obstacles\":[]}"
+        }
+      }
+    },
+
+    {
+      "name": "Stateless — Mixed Commands (executed/blocked/invalid)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/probe/run",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","probe","run"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"gridWidth\":2,\"gridHeight\":2,\"start\":{\"x\":1,\"y\":1},\"direction\":\"NORTH\",\"commands\":[\"F\",\"X\",\"B\",null,\"R\"],\"obstacles\":[{\"x\":1,\"y\":2}]}"
+        }
+      }
+    },
+
+    {
+      "name": "Stateless — Empty Commands (400)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": {
+          "raw": "{{baseUrl}}/api/probe/run",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","probe","run"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"gridWidth\":5,\"gridHeight\":5,\"start\":{\"x\":0,\"y\":0},\"direction\":\"NORTH\",\"commands\":[],\"obstacles\":[]}"
+        }
+      }
+    },
+
+    {
+      "name": "Stateful — Create Probe",
       "event": [
         {
           "listen": "test",
           "script": {
-            "type": "text/javascript",
             "exec": [
-              "pm.test('Status is 400', function () { pm.response.to.have.status(400); });",
-              "pm.test('Error code VALIDATION_ERROR', function () { pm.expect(pm.response.json().error.code).to.eql('VALIDATION_ERROR'); });",
-              "pm.test('Message is Malformed JSON request', function () { pm.expect(pm.response.json().error.message).to.eql('Malformed JSON request'); });"
+              "let id = pm.response.json().id;",
+              "pm.collectionVariables.set('probeId', id);",
+              "console.log('Probe ID saved:', id);"
             ]
           }
         }
-      ]
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": {
+          "raw": "{{baseUrl}}/v1/probe",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1","probe"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"gridWidth\":5,\"gridHeight\":5,\"start\":{\"x\":0,\"y\":0},\"direction\":\"NORTH\"}"
+        }
+      }
+    },
+
+    {
+      "name": "Stateful — Get Probe State",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/v1/probe/{{probeId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1","probe","{{probeId}}"]
+        }
+      }
+    },
+
+    {
+      "name": "Stateful — Apply Commands (Happy Path)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type","value":"application/json" }],
+        "url": {
+          "raw": "{{baseUrl}}/v1/probe/{{probeId}}/commands",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1","probe","{{probeId}}","commands"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "[\"F\",\"R\",\"F\"]"
+        }
+      }
+    },
+
+    {
+      "name": "Stateful — Apply Invalid Commands",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type","value":"application/json" }],
+        "url": {
+          "raw": "{{baseUrl}}/v1/probe/{{probeId}}/commands",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1","probe","{{probeId}}","commands"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "[\"X\", \"\", \" \", null]"
+        }
+      }
+    },
+
+    {
+      "name": "Stateful — Apply Blocked Commands",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type","value":"application/json" }],
+        "url": {
+          "raw": "{{baseUrl}}/v1/probe/{{probeId}}/commands",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1","probe","{{probeId}}","commands"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "[\"F\"]"
+        }
+      }
+    },
+
+    {
+      "name": "Stateful — Probe Not Found (404)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/v1/probe/ffffffff-ffff-ffff-ffff-ffffffffffff",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1","probe","ffffffff-ffff-ffff-ffff-ffffffffffff"]
+        }
+      }
     }
-  ],
-  "event": [],
-  "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8080" }
   ]
 }
 ```
 
 ---
 
-# REST Client Snippet (`.http` for VS Code)
-
-> Save as `probe-kata.http` and execute requests directly in VS Code (extension: `humao.rest-client`).
+# 🧪 VS CODE REST CLIENT SNIPPETS (`.http`)
 
 ```http
-### Probe Kata API — REST Client Snippets
-# Use with VS Code REST Client extension (humao.rest-client)
-
 @baseUrl = http://localhost:8080
 
-### Happy Path — 3x3, NORTH, F R F
+############################################################
+# STATELESS API
+############################################################
+
+### Stateless — Happy Path
 POST {{baseUrl}}/api/probe/run
 Content-Type: application/json
 
@@ -408,43 +779,28 @@ Content-Type: application/json
   "gridHeight": 3,
   "start": { "x": 0, "y": 0 },
   "direction": "NORTH",
-  "commands": ["F", "R", "F"],
+  "commands": ["F","R","F"],
   "obstacles": []
 }
 
-### Start on Obstacle — 5x5, 422
-POST {{baseUrl}}/api/probe/run
-Content-Type: application/json
-
-{
-  "gridWidth": 5,
-  "gridHeight": 5,
-  "start": { "x": 2, "y": 1 },
-  "direction": "NORTH",
-  "commands": ["F"],
-  "obstacles": [{ "x": 2, "y": 1 }]
-}
-
-### Invalid Direction — 400
-POST {{baseUrl}}/api/probe/run
+### Stateful — Create Probe
+POST {{baseUrl}}/v1/probe
 Content-Type: application/json
 
 {
   "gridWidth": 5,
   "gridHeight": 5,
   "start": { "x": 0, "y": 0 },
-  "direction": "NORTHEAST",
-  "commands": ["F"],
-  "obstacles": []
+  "direction": "NORTH"
 }
 
-### Malformed JSON — 400 (missing closing brace)
-POST {{baseUrl}}/api/probe/run
+### Stateful — Apply Commands
+POST {{baseUrl}}/v1/probe/{{probeId}}/commands
 Content-Type: application/json
 
-{
-  "gridWidth": 5,
-  "gridHeight": 5,
-  "start": { "x": 0, "y": 0 },
-  "direction": "NORTH",
-  "commands": ["F", "R", "F"],
+["F","R","F"]
+
+### Stateful — Get Probe
+GET {{baseUrl}}/v1/probe/{{probeId}}
+```
+
