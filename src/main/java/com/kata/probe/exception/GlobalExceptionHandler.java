@@ -46,4 +46,11 @@ public class GlobalExceptionHandler {
                 )
         );
     }
+
+    @ExceptionHandler(ProbeNotFoundException.class)
+    public ResponseEntity<ApiError> handleNotFound(ProbeNotFoundException ex) {
+        return ResponseEntity.status(404)
+                .body(new ApiError("NOT_FOUND", ex.getMessage()));
+    }
+
 }

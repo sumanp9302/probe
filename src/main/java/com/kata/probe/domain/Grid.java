@@ -1,22 +1,9 @@
 package com.kata.probe.domain;
-import java.util.HashSet;
-import java.util.Set;
 
-public class Grid {
-    private final int width;
-    private final int height;
-    private final Set<Coordinate> obstacles = new HashSet<>();
+public record Grid(int width, int height) {
 
-    public Grid(int width, int height) {
-        if (width <= 0 || height <= 0) throw new IllegalArgumentException("Invalid grid size");
-        this.width = width; this.height = height;
+    public boolean isWithinBounds(Coordinate c) {
+        return c.x() >= 0 && c.x() < width &&
+                c.y() >= 0 && c.y() < height;
     }
-
-    public boolean isWithinBounds(Coordinate coordinate) {
-        return coordinate.x() >= 0 && coordinate.x() < width && coordinate.y() >= 0 && coordinate.y() < height;
-    }
-
-    public boolean isObstacle(Coordinate coordinate) { return obstacles.contains(coordinate); }
-
-    public void addObstacle(Coordinate coordinate) { obstacles.add(coordinate); }
 }
