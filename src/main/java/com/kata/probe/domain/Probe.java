@@ -14,6 +14,9 @@ public class Probe {
         if (!grid.isWithinBounds(start)) {
             throw new IllegalArgumentException("Start position out of bounds: " + start);
         }
+        if (direction == null) {
+            throw new IllegalArgumentException("Direction cannot be null");
+        }
         this.position = start;
         this.direction = direction;
         this.grid = grid;

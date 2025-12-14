@@ -33,4 +33,19 @@ public class ProbeServiceTest {
         assertEquals(new Coordinate(1, 0), response.finalPosition);
     }
 
+    @Test
+    void invalid_commands_are_counted_as_invalid() {
+        RunRequest req = new RunRequest();
+        req.gridWidth = 5;
+        req.gridHeight = 5;
+        req.start = new Coordinate(2,2);
+        req.direction = Direction.NORTH;
+        req.commands = Arrays.asList("X", "", " ", null); // invalid commands
+        req.obstacles = List.of();
+
+        RunResponse response = probeService.run(req);
+
+        assertEquals(0, response.executionSummary.executed);
+        assertEquals(4, response.executionSummary.invalid);
+    }
 }

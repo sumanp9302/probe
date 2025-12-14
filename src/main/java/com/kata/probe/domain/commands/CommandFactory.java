@@ -3,7 +3,7 @@ package com.kata.probe.domain.commands;
 public class CommandFactory {
 
     public static Command from(String raw) {
-        if (raw == null) return new InvalidCommand();
+        if (raw == null || raw.isBlank()) return new InvalidCommand();
 
         String cmd = raw.trim().toUpperCase();
         return switch (cmd) {

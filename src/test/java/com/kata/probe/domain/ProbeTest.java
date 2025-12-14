@@ -44,4 +44,27 @@ class ProbeTest {
         probe.turnRight();
         assertEquals(Direction.NORTH, probe.getDirection());
     }
+
+    @Test
+    void cannot_start_outside_grid() {
+        Grid grid = new Grid(3,3);
+        ObstacleMap obstacles = new ObstacleMap();
+
+        assertThrows(IllegalArgumentException.class,
+                () -> new Probe(new Coordinate(5,5), Direction.NORTH, grid, obstacles)
+        );
+    }
+
+    @Test
+    void turning_does_not_add_to_visited() {
+        Grid grid = new Grid(3,3);
+        ObstacleMap obs = new ObstacleMap();
+        Probe probe = new Probe(new Coordinate(1,1), Direction.NORTH, grid, obs);
+
+        probe.turnLeft();
+        probe.turnRight();
+
+        assertEquals(1, probe.getVisited().size());
+    }
+
 }
